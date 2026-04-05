@@ -107,3 +107,7 @@ docker build -f Containerfile -t ima-editor .
 docker run -e GITHUB_TOKEN=$TOKEN -p 2719:2719 ima-editor
 # Port 2719; auth handled upstream by oauth2-proxy
 ```
+
+## Deployment
+
+via hbox
