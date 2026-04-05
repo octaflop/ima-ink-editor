@@ -32,8 +32,10 @@ def _imports():
 
 @app.cell
 def _helpers(httpx, base64, API, HEADERS, GITHUB_BRANCH):
+    TIMEOUT = 30.0
+
     def gh_get(path: str) -> dict:
-        r = httpx.get(f"{API}/{path}", headers=HEADERS, params={"ref": GITHUB_BRANCH})
+        r = httpx.get(f"{API}/{path}", headers=HEADERS, params={"ref": GITHUB_BRANCH}, timeout=TIMEOUT)
         r.raise_for_status()
         return r.json()
 
@@ -54,6 +56,7 @@ def _helpers(httpx, base64, API, HEADERS, GITHUB_BRANCH):
                 "sha": sha,
                 "branch": GITHUB_BRANCH,
             },
+            timeout=TIMEOUT,
         )
         r.raise_for_status()
         return r.json()
@@ -68,6 +71,7 @@ def _helpers(httpx, base64, API, HEADERS, GITHUB_BRANCH):
             f"{API}/dispatches",
             headers=HEADERS,
             json={"event_type": "data-updated"},
+            timeout=TIMEOUT,
         )
         r.raise_for_status()
 
@@ -119,7 +123,7 @@ def _post_editor(mo, post_select, gh_get_file, gh_put_file):
     if save_btn.value:
         try:
             gh_put_file(_path, editor.value, sha, f"edit: update {post_select.value}")
-            mo.stop(True, mo.callout(mo.md(f"✅ Saved `{path}` — deploy triggered by GHA"), kind="success"))
+            mo.stop(True, mo.callout(mo.md(f"✅ Saved `{_path}` — deploy triggered by GHA"), kind="success"))
         except Exception as e:
             mo.stop(True, mo.callout(mo.md(f"Error saving: {e}"), kind="danger"))
 
@@ -149,7 +153,7 @@ def _data_tab(mo, gh_get_file, gh_put_file):
         if data_save.value:
             try:
                 gh_put_file(_path, data_editor.value, _sha, f"data: update {data_select.value}")
-                mo.stop(True, mo.callout(mo.md(f"✅ Saved `{path}`"), kind="success"))
+                mo.stop(True, mo.callout(mo.md(f"✅ Saved `{_path}`"), kind="success"))
             except Exception as e:
                 mo.stop(True, mo.callout(mo.md(f"Error: {e}"), kind="danger"))
 
