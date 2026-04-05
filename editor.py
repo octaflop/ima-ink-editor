@@ -89,19 +89,7 @@ def _helpers(httpx, base64, API, HEADERS, GITHUB_BRANCH):
         )
         r.raise_for_status()
 
-    return gh_get, gh_get_file, gh_put_file, gh_list_dir, gh_dispatch
-
-
-@app.cell
-def _tab_selector(mo):
-    tab = mo.ui.tabs(
-        {
-            "Posts": mo.md(""),
-            "Data": mo.md(""),
-            "New post": mo.md(""),
-        }
-    )
-    return (tab,)
+    return gh_get, gh_get_file, gh_put_file, gh_list_dir, gh_dispatch, TIMEOUT
 
 
 @app.cell
@@ -130,27 +118,27 @@ def _post_editor(mo, post_select, gh_get_file):
         editor = mo.ui.code_editor(value="", language="markdown")
         save_btn = mo.ui.button(label="Save & commit")
         sha = ""
-        _path = ""
+        post_path = ""
     else:
-        _path = f"posts/{post_select.value}/index.qmd"
+        post_path = f"posts/{post_select.value}/index.qmd"
         try:
-            content, sha = gh_get_file(_path)
+            content, sha = gh_get_file(post_path)
         except Exception as e:
             mo.stop(True, mo.callout(mo.md(f"Error loading post: {e}"), kind="danger"))
         editor = mo.ui.code_editor(value=content, language="markdown")
         save_btn = mo.ui.button(label="Save & commit")
-    return editor, save_btn, sha, _path
+    return editor, save_btn, sha, post_path
 
 
 @app.cell
-def _post_save_action(mo, post_select, editor, save_btn, sha, _path, gh_put_file):
-    if save_btn.value and _path:
+def _post_save_action(mo, post_select, editor, save_btn, sha, post_path, gh_put_file):
+    if save_btn.value and post_path:
         try:
-            gh_put_file(_path, editor.value, sha, f"edit: update {post_select.value}")
+            gh_put_file(post_path, editor.value, sha, f"edit: update {post_select.value}")
             mo.stop(
                 True,
                 mo.callout(
-                    mo.md(f"✅ Saved `{_path}` — deploy triggered by GHA"),
+                    mo.md(f"✅ Saved `{post_path}` — deploy triggered by GHA"),
                     kind="success",
                 ),
             )
@@ -177,29 +165,29 @@ def _data_editor(mo, data_select, DATA_FILES, gh_get_file):
     if not data_select.value:
         data_editor = mo.ui.code_editor(value="", language="yaml")
         data_save = mo.ui.button(label="Save & commit")
-        _sha = ""
-        _path = ""
+        data_sha = ""
+        data_path = ""
     else:
-        _path = DATA_FILES[data_select.value]
+        data_path = DATA_FILES[data_select.value]
         try:
-            _content, _sha = gh_get_file(_path)
+            _content, data_sha = gh_get_file(data_path)
         except Exception as e:
             mo.stop(True, mo.callout(mo.md(f"Error: {e}"), kind="danger"))
         data_editor = mo.ui.code_editor(value=_content, language="yaml")
         data_save = mo.ui.button(label="Save & commit")
-    return data_editor, data_save, _sha, _path
+    return data_editor, data_save, data_sha, data_path
 
 
 @app.cell
 def _data_save_action(
-    mo, data_select, data_editor, data_save, _sha, _path, gh_put_file
+    mo, data_select, data_editor, data_save, data_sha, data_path, gh_put_file
 ):
-    if data_save.value and _path:
+    if data_save.value and data_path:
         try:
             gh_put_file(
-                _path, data_editor.value, _sha, f"data: update {data_select.value}"
+                data_path, data_editor.value, data_sha, f"data: update {data_select.value}"
             )
-            mo.stop(True, mo.callout(mo.md(f"✅ Saved `{_path}`"), kind="success"))
+            mo.stop(True, mo.callout(mo.md(f"✅ Saved `{data_path}`"), kind="success"))
         except Exception as e:
             mo.stop(True, mo.callout(mo.md(f"Error: {e}"), kind="danger"))
 
@@ -227,6 +215,7 @@ def _new_post_action(
     API,
     HEADERS,
     GITHUB_BRANCH,
+    TIMEOUT,
     date,
     title_in,
     slug_in,
@@ -255,17 +244,20 @@ Internal details for Confluence review.
 :::
 """
         _path = f"posts/{slug}/index.qmd"
+        _exists = False
         try:
-            # Check it doesn't already exist
-            try:
-                gh_get_file(_path)
-                mo.stop(
-                    True,
-                    mo.callout(mo.md(f"Post `{slug}` already exists"), kind="warn"),
-                )
-            except Exception:
-                pass  # 404 expected — good
+            gh_get_file(_path)
+            _exists = True
+        except Exception:
+            pass  # 404 expected — good
 
+        if _exists:
+            mo.stop(
+                True,
+                mo.callout(mo.md(f"Post `{slug}` already exists"), kind="warn"),
+            )
+
+        try:
             _encoded = base64.b64encode(_template_content.encode()).decode()
             _r = httpx.put(
                 f"{API}/contents/{_path}",
@@ -275,6 +267,7 @@ Internal details for Confluence review.
                     "content": _encoded,
                     "branch": GITHUB_BRANCH,
                 },
+                timeout=TIMEOUT,
             )
             _r.raise_for_status()
             mo.stop(
@@ -314,7 +307,6 @@ def _deploy_action(mo, gh_dispatch, deploy_btn):
 @app.cell
 def _layout(
     mo,
-    tab,
     post_select,
     editor,
     save_btn,
