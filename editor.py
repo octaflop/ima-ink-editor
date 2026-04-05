@@ -1,7 +1,7 @@
 import marimo
 
 __generated_with = "0.10.0"
-app = marimo.App(title="ima.ink editor", width="full")
+app = marimo.App(width="full")
 
 
 @app.cell
@@ -11,7 +11,6 @@ def _imports():
     import yaml
     import os
     import base64
-    import json
     from datetime import date
 
     GITHUB_TOKEN = os.environ["GITHUB_TOKEN"]
@@ -29,7 +28,6 @@ def _imports():
         yaml,
         os,
         base64,
-        json,
         date,
         GITHUB_TOKEN,
         GITHUB_REPO,
@@ -61,15 +59,17 @@ def _helpers(httpx, base64, API, HEADERS, GITHUB_BRANCH):
 
     def gh_put_file(path: str, content: str, sha: str, message: str) -> dict:
         encoded = base64.b64encode(content.encode()).decode()
+        body = {
+            "message": message,
+            "content": encoded,
+            "branch": GITHUB_BRANCH,
+        }
+        if sha:
+            body["sha"] = sha
         r = httpx.put(
             f"{API}/contents/{path}",
             headers=HEADERS,
-            json={
-                "message": message,
-                "content": encoded,
-                "sha": sha,
-                "branch": GITHUB_BRANCH,
-            },
+            json=body,
             timeout=TIMEOUT,
         )
         r.raise_for_status()
@@ -100,16 +100,14 @@ def _posts_tab(mo, gh_list_dir):
         post_dirs = [
             e["name"] for e in entries if e["type"] == "dir" and e["name"] != "template"
         ]
+        posts_load_err = mo.md("")
     except Exception as e:
         post_dirs = []
-        mo.stop(True, mo.callout(mo.md(f"Error listing posts: {e}"), kind="danger"))
+        posts_load_err = mo.callout(mo.md(f"Error listing posts: {e}"), kind="danger")
 
-    post_select = mo.ui.dropdown(
-        options=post_dirs,
-        label="Select post",
-    )
+    post_select = mo.ui.dropdown(options=post_dirs, label="Select post")
 
-    return post_select, post_dirs
+    return post_select, post_dirs, posts_load_err
 
 
 @app.cell
@@ -119,31 +117,57 @@ def _post_editor(mo, post_select, gh_get_file):
         save_btn = mo.ui.button(label="Save & commit")
         sha = ""
         post_path = ""
+        post_load_status = mo.md("")
     else:
         post_path = f"posts/{post_select.value}/index.qmd"
         try:
             content, sha = gh_get_file(post_path)
+            post_load_status = mo.md("")
         except Exception as e:
-            mo.stop(True, mo.callout(mo.md(f"Error loading post: {e}"), kind="danger"))
+            content = ""
+            sha = ""
+            post_load_status = mo.callout(
+                mo.md(f"Error loading post: {e}"), kind="danger"
+            )
         editor = mo.ui.code_editor(value=content, language="markdown")
         save_btn = mo.ui.button(label="Save & commit")
-    return editor, save_btn, sha, post_path
+    return editor, save_btn, sha, post_path, post_load_status
 
 
 @app.cell
-def _post_save_action(mo, post_select, editor, save_btn, sha, post_path, gh_put_file):
+def _post_save_action(
+    mo,
+    GITHUB_REPO,
+    GITHUB_BRANCH,
+    post_select,
+    editor,
+    save_btn,
+    sha,
+    post_path,
+    gh_put_file,
+):
+    post_status = mo.md("")
     if save_btn.value and post_path:
         try:
-            gh_put_file(post_path, editor.value, sha, f"edit: update {post_select.value}")
-            mo.stop(
-                True,
-                mo.callout(
-                    mo.md(f"✅ Saved `{post_path}` — deploy triggered by GHA"),
-                    kind="success",
-                ),
+            result = gh_put_file(
+                post_path, editor.value, sha, f"edit: update {post_select.value}"
+            )
+            commit_url = result.get("commit", {}).get("html_url", "")
+            gh_url = (
+                f"https://github.com/{GITHUB_REPO}/blob/{GITHUB_BRANCH}/{post_path}"
+            )
+            links = (
+                f" — [commit]({commit_url}) · [GitHub]({gh_url})"
+                if commit_url
+                else f" — [GitHub]({gh_url})"
+            )
+            post_status = mo.callout(
+                mo.md(f"✅ Saved `{post_path}`{links}"),
+                kind="success",
             )
         except Exception as e:
-            mo.stop(True, mo.callout(mo.md(f"Error saving: {e}"), kind="danger"))
+            post_status = mo.callout(mo.md(f"❌ Save failed: {e}"), kind="danger")
+    return (post_status,)
 
 
 @app.cell
@@ -167,29 +191,59 @@ def _data_editor(mo, data_select, DATA_FILES, gh_get_file):
         data_save = mo.ui.button(label="Save & commit")
         data_sha = ""
         data_path = ""
+        data_load_status = mo.md("")
     else:
         data_path = DATA_FILES[data_select.value]
         try:
             _content, data_sha = gh_get_file(data_path)
+            data_load_status = mo.md("")
         except Exception as e:
-            mo.stop(True, mo.callout(mo.md(f"Error: {e}"), kind="danger"))
+            _content = ""
+            data_sha = ""
+            data_load_status = mo.callout(
+                mo.md(f"Error loading {data_select.value}: {e}"), kind="danger"
+            )
         data_editor = mo.ui.code_editor(value=_content, language="yaml")
         data_save = mo.ui.button(label="Save & commit")
-    return data_editor, data_save, data_sha, data_path
+    return data_editor, data_save, data_sha, data_path, data_load_status
 
 
 @app.cell
 def _data_save_action(
-    mo, data_select, data_editor, data_save, data_sha, data_path, gh_put_file
+    mo,
+    GITHUB_REPO,
+    GITHUB_BRANCH,
+    data_select,
+    data_editor,
+    data_save,
+    data_sha,
+    data_path,
+    gh_put_file,
 ):
+    data_status = mo.md("")
     if data_save.value and data_path:
         try:
-            gh_put_file(
-                data_path, data_editor.value, data_sha, f"data: update {data_select.value}"
+            result = gh_put_file(
+                data_path,
+                data_editor.value,
+                data_sha,
+                f"data: update {data_select.value}",
             )
-            mo.stop(True, mo.callout(mo.md(f"✅ Saved `{data_path}`"), kind="success"))
+            commit_url = result.get("commit", {}).get("html_url", "")
+            gh_url = (
+                f"https://github.com/{GITHUB_REPO}/blob/{GITHUB_BRANCH}/{data_path}"
+            )
+            links = (
+                f" — [commit]({commit_url}) · [GitHub]({gh_url})"
+                if commit_url
+                else f" — [GitHub]({gh_url})"
+            )
+            data_status = mo.callout(
+                mo.md(f"✅ Saved `{data_path}`{links}"), kind="success"
+            )
         except Exception as e:
-            mo.stop(True, mo.callout(mo.md(f"Error: {e}"), kind="danger"))
+            data_status = mo.callout(mo.md(f"❌ Save failed: {e}"), kind="danger")
+    return (data_status,)
 
 
 @app.cell
@@ -209,13 +263,10 @@ def _new_post_tab(mo):
 @app.cell
 def _new_post_action(
     mo,
-    base64,
-    httpx,
-    gh_get_file,
-    API,
-    HEADERS,
+    GITHUB_REPO,
     GITHUB_BRANCH,
-    TIMEOUT,
+    gh_get_file,
+    gh_put_file,
     date,
     title_in,
     slug_in,
@@ -223,6 +274,7 @@ def _new_post_action(
     desc_in,
     create_btn,
 ):
+    new_post_status = mo.md("")
     if create_btn.value and title_in.value and slug_in.value:
         slug = slug_in.value.strip().lower().replace(" ", "-")
         cats = [c.strip() for c in cats_in.value.split(",") if c.strip()]
@@ -252,33 +304,31 @@ Internal details for Confluence review.
             pass  # 404 expected — good
 
         if _exists:
-            mo.stop(
-                True,
-                mo.callout(mo.md(f"Post `{slug}` already exists"), kind="warn"),
+            new_post_status = mo.callout(
+                mo.md(f"⚠️ Post `{slug}` already exists — edit it in the Posts tab"),
+                kind="warn",
             )
-
-        try:
-            _encoded = base64.b64encode(_template_content.encode()).decode()
-            _r = httpx.put(
-                f"{API}/contents/{_path}",
-                headers=HEADERS,
-                json={
-                    "message": f"post: create {slug}",
-                    "content": _encoded,
-                    "branch": GITHUB_BRANCH,
-                },
-                timeout=TIMEOUT,
-            )
-            _r.raise_for_status()
-            mo.stop(
-                True,
-                mo.callout(
-                    mo.md(f"✅ Created `{_path}` — edit it in the Posts tab"),
+        else:
+            try:
+                result = gh_put_file(
+                    _path, _template_content, "", f"post: create {slug}"
+                )
+                commit_url = result.get("commit", {}).get("html_url", "")
+                gh_url = (
+                    f"https://github.com/{GITHUB_REPO}/blob/{GITHUB_BRANCH}/{_path}"
+                )
+                links = (
+                    f" — [commit]({commit_url}) · [GitHub]({gh_url})"
+                    if commit_url
+                    else f" — [GitHub]({gh_url})"
+                )
+                new_post_status = mo.callout(
+                    mo.md(f"✅ Created `{_path}` — edit it in the Posts tab{links}"),
                     kind="success",
-                ),
-            )
-        except Exception as e:
-            mo.stop(True, mo.callout(mo.md(f"Error: {e}"), kind="danger"))
+                )
+            except Exception as e:
+                new_post_status = mo.callout(mo.md(f"❌ Error: {e}"), kind="danger")
+    return (new_post_status,)
 
 
 @app.cell
@@ -290,49 +340,79 @@ def _deploy_btn(mo):
 
 @app.cell
 def _deploy_action(mo, gh_dispatch, deploy_btn):
+    deploy_status = mo.md("")
     if deploy_btn.value:
         try:
             gh_dispatch()
-            mo.stop(
-                True,
-                mo.callout(
-                    mo.md("✅ Dispatch sent — GHA will rebuild ima.ink in ~60s"),
-                    kind="success",
-                ),
+            deploy_status = mo.callout(
+                mo.md("✅ Dispatch sent — GHA will rebuild ima.ink in ~60s"),
+                kind="success",
             )
         except Exception as e:
-            mo.stop(True, mo.callout(mo.md(f"Error: {e}"), kind="danger"))
+            deploy_status = mo.callout(mo.md(f"❌ Error: {e}"), kind="danger")
+    return (deploy_status,)
 
 
 @app.cell
 def _layout(
     mo,
+    posts_load_err,
     post_select,
+    post_load_status,
     editor,
     save_btn,
+    post_status,
     data_select,
+    data_load_status,
     data_editor,
     data_save,
+    data_status,
     title_in,
     slug_in,
     cats_in,
     desc_in,
     create_btn,
+    new_post_status,
     deploy_btn,
+    deploy_status,
 ):
     mo.vstack(
         [
             mo.md("# ima.ink editor"),
-            mo.tabs(
+            mo.ui.tabs(
                 {
-                    "Posts": mo.vstack([post_select, editor, save_btn]),
-                    "Data": mo.vstack([data_select, data_editor, data_save]),
+                    "Posts": mo.vstack(
+                        [
+                            posts_load_err,
+                            post_select,
+                            post_load_status,
+                            editor,
+                            save_btn,
+                            post_status,
+                        ]
+                    ),
+                    "Data": mo.vstack(
+                        [
+                            data_select,
+                            data_load_status,
+                            data_editor,
+                            data_save,
+                            data_status,
+                        ]
+                    ),
                     "New post": mo.vstack(
-                        [title_in, slug_in, cats_in, desc_in, create_btn]
+                        [
+                            title_in,
+                            slug_in,
+                            cats_in,
+                            desc_in,
+                            create_btn,
+                            new_post_status,
+                        ]
                     ),
                 }
             ),
             mo.md("---"),
-            deploy_btn,
+            mo.hstack([deploy_btn, deploy_status], align="center"),
         ]
     )
