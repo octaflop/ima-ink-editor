@@ -4,7 +4,7 @@ WORKDIR /app
 COPY pyproject.toml uv.lock* ./
 RUN uv sync --no-dev --frozen
 
-COPY editor.py .
+COPY editor.py marimo.toml* ./
 
 ENV MARIMO_SKIP_UPDATE_CHECK=1
 
