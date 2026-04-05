@@ -109,7 +109,7 @@ def _posts_tab(mo, gh_list_dir, gh_get_file, gh_put_file):
 @app.cell
 def _post_editor(mo, post_select, gh_get_file, gh_put_file):
     if not post_select.value:
-        mo.stop(False)
+        mo.stop(True)
 
     _path = f"posts/{post_select.value}/index.qmd"
     try:
