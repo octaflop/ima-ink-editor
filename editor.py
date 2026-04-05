@@ -89,7 +89,7 @@ def _tab_selector(mo):
 
 
 @app.cell
-def _posts_tab(mo, gh_list_dir, gh_get_file, gh_put_file):
+def _posts_tab(mo, gh_list_dir):
     # ── Posts tab ─────────────────────────────────────────────────────────────
     try:
         entries = gh_list_dir("posts")
@@ -103,11 +103,11 @@ def _posts_tab(mo, gh_list_dir, gh_get_file, gh_put_file):
         label="Select post",
     )
 
-    return post_dirs, post_select, gh_get_file, gh_put_file
+    return post_select, post_dirs
 
 
 @app.cell
-def _post_editor(mo, post_select, gh_get_file, gh_put_file):
+def _post_editor(mo, post_select, gh_get_file):
     if not post_select.value:
         mo.stop(True)
 
@@ -120,6 +120,11 @@ def _post_editor(mo, post_select, gh_get_file, gh_put_file):
     editor = mo.ui.code_editor(value=content, language="markdown")
     save_btn = mo.ui.button(label="Save & commit")
 
+    return editor, save_btn, sha, _path
+
+
+@app.cell
+def _post_save_action(mo, post_select, editor, save_btn, sha, _path, gh_put_file):
     if save_btn.value:
         try:
             gh_put_file(_path, editor.value, sha, f"edit: update {post_select.value}")
@@ -127,11 +132,9 @@ def _post_editor(mo, post_select, gh_get_file, gh_put_file):
         except Exception as e:
             mo.stop(True, mo.callout(mo.md(f"Error saving: {e}"), kind="danger"))
 
-    return editor, save_btn
-
 
 @app.cell
-def _data_tab(mo, gh_get_file, gh_put_file):
+def _data_tab(mo):
     # ── Data tab ───────────────────────────────────────────────────────────────
     DATA_FILES = {
         "projects": "_data/projects.yml",
@@ -139,36 +142,51 @@ def _data_tab(mo, gh_get_file, gh_put_file):
         "sites": "_data/sites.yml",
     }
     data_select = mo.ui.dropdown(options=list(DATA_FILES.keys()), label="Select data file")
-
-    if data_select.value:
-        _path = DATA_FILES[data_select.value]
-        try:
-            _content, _sha = gh_get_file(_path)
-        except Exception as e:
-            mo.stop(True, mo.callout(mo.md(f"Error: {e}"), kind="danger"))
-
-        data_editor = mo.ui.code_editor(value=_content, language="yaml")
-        data_save = mo.ui.button(label="Save & commit")
-
-        if data_save.value:
-            try:
-                gh_put_file(_path, data_editor.value, _sha, f"data: update {data_select.value}")
-                mo.stop(True, mo.callout(mo.md(f"✅ Saved `{_path}`"), kind="success"))
-            except Exception as e:
-                mo.stop(True, mo.callout(mo.md(f"Error: {e}"), kind="danger"))
-
-    return data_select,
+    return data_select, DATA_FILES
 
 
 @app.cell
-def _new_post_tab(mo, base64, httpx, gh_get_file, API, HEADERS, GITHUB_BRANCH, date):
+def _data_editor(mo, data_select, DATA_FILES, gh_get_file):
+    if not data_select.value:
+        mo.stop(True)
+
+    _path = DATA_FILES[data_select.value]
+    try:
+        _content, _sha = gh_get_file(_path)
+    except Exception as e:
+        mo.stop(True, mo.callout(mo.md(f"Error: {e}"), kind="danger"))
+
+    data_editor = mo.ui.code_editor(value=_content, language="yaml")
+    data_save = mo.ui.button(label="Save & commit")
+
+    return data_editor, data_save, _sha, _path
+
+
+@app.cell
+def _data_save_action(mo, data_select, data_editor, data_save, _sha, _path, gh_put_file):
+    if data_save.value:
+        try:
+            gh_put_file(_path, data_editor.value, _sha, f"data: update {data_select.value}")
+            mo.stop(True, mo.callout(mo.md(f"✅ Saved `{_path}`"), kind="success"))
+        except Exception as e:
+            mo.stop(True, mo.callout(mo.md(f"Error: {e}"), kind="danger"))
+
+
+@app.cell
+def _new_post_tab(mo):
     # ── New post tab ───────────────────────────────────────────────────────────
-    title_in   = mo.ui.text(label="Title", placeholder="My Post Title")
-    slug_in    = mo.ui.text(label="Slug", placeholder="my-post-title")
-    cats_in    = mo.ui.text(label="Categories (comma-separated)", placeholder="python, data")
-    desc_in    = mo.ui.text(label="Description", placeholder="One-line summary")
+    title_in = mo.ui.text(label="Title", placeholder="My Post Title")
+    slug_in = mo.ui.text(label="Slug", placeholder="my-post-title")
+    cats_in = mo.ui.text(label="Categories (comma-separated)", placeholder="python, data")
+    desc_in = mo.ui.text(label="Description", placeholder="One-line summary")
     create_btn = mo.ui.button(label="Create post")
 
+    return title_in, slug_in, cats_in, desc_in, create_btn
+
+
+@app.cell
+def _new_post_action(mo, base64, httpx, gh_get_file, API, HEADERS, GITHUB_BRANCH, date, title_in, slug_in, cats_in,
+                     desc_in, create_btn):
     if create_btn.value and title_in.value and slug_in.value:
         slug = slug_in.value.strip().lower().replace(" ", "-")
         cats = [c.strip() for c in cats_in.value.split(",") if c.strip()]
@@ -197,6 +215,7 @@ Internal details for Confluence review.
                 mo.stop(True, mo.callout(mo.md(f"Post `{slug}` already exists"), kind="warn"))
             except Exception:
                 pass  # 404 expected — good
+
             _encoded = base64.b64encode(_template_content.encode()).decode()
             _r = httpx.put(
                 f"{API}/contents/{_path}",
@@ -212,29 +231,32 @@ Internal details for Confluence review.
         except Exception as e:
             mo.stop(True, mo.callout(mo.md(f"Error: {e}"), kind="danger"))
 
-    return title_in, slug_in, cats_in, desc_in, create_btn
+
+@app.cell
+def _deploy_btn(mo):
+    # ── Force redeploy ─────────────────────────────────────────────────────────
+    deploy_btn = mo.ui.button(label="Force redeploy ima.ink", kind="danger")
+    return deploy_btn,
 
 
 @app.cell
-def _deploy_btn(mo, gh_dispatch):
-    # ── Force redeploy ─────────────────────────────────────────────────────────
-    deploy_btn = mo.ui.button(label="Force redeploy ima.ink", kind="danger")
+def _deploy_action(mo, gh_dispatch, deploy_btn):
     if deploy_btn.value:
         try:
             gh_dispatch()
             mo.stop(True, mo.callout(mo.md("✅ Dispatch sent — GHA will rebuild ima.ink in ~60s"), kind="success"))
         except Exception as e:
             mo.stop(True, mo.callout(mo.md(f"Error: {e}"), kind="danger"))
-    return deploy_btn,
 
 
 @app.cell
-def _layout(mo, tab, post_select, editor, save_btn, data_select, title_in, slug_in, cats_in, desc_in, create_btn, deploy_btn):
+def _layout(mo, tab, post_select, editor, save_btn, data_select, data_editor, data_save, title_in, slug_in, cats_in,
+            desc_in, create_btn, deploy_btn):
     mo.vstack([
         mo.md("# ima.ink editor"),
         mo.tabs({
             "Posts": mo.vstack([post_select, editor, save_btn]),
-            "Data": mo.vstack([data_select]),
+            "Data": mo.vstack([data_select, data_editor, data_save]),
             "New post": mo.vstack([title_in, slug_in, cats_in, desc_in, create_btn]),
         }),
         mo.md("---"),
