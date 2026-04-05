@@ -139,16 +139,16 @@ def _data_tab(mo, gh_get_file, gh_put_file):
     if data_select.value:
         path = DATA_FILES[data_select.value]
         try:
-            content, sha = gh_get_file(path)
+            _content, _sha = gh_get_file(path)
         except Exception as e:
             mo.stop(True, mo.callout(mo.md(f"Error: {e}"), kind="danger"))
 
-        data_editor = mo.ui.code_editor(value=content, language="yaml")
+        data_editor = mo.ui.code_editor(value=_content, language="yaml")
         data_save = mo.ui.button(label="Save & commit")
 
         if data_save.value:
             try:
-                gh_put_file(path, data_editor.value, sha, f"data: update {data_select.value}")
+                gh_put_file(path, data_editor.value, _sha, f"data: update {data_select.value}")
                 mo.stop(True, mo.callout(mo.md(f"✅ Saved `{path}`"), kind="success"))
             except Exception as e:
                 mo.stop(True, mo.callout(mo.md(f"Error: {e}"), kind="danger"))
@@ -157,7 +157,7 @@ def _data_tab(mo, gh_get_file, gh_put_file):
 
 
 @app.cell
-def _new_post_tab(mo, base64, gh_get_file, gh_put_file, date):
+def _new_post_tab(mo, base64, httpx, gh_get_file, API, HEADERS, GITHUB_BRANCH, date):
     # ── New post tab ───────────────────────────────────────────────────────────
     title_in   = mo.ui.text(label="Title", placeholder="My Post Title")
     slug_in    = mo.ui.text(label="Slug", placeholder="my-post-title")
@@ -169,7 +169,7 @@ def _new_post_tab(mo, base64, gh_get_file, gh_put_file, date):
         slug = slug_in.value.strip().lower().replace(" ", "-")
         cats = [c.strip() for c in cats_in.value.split(",") if c.strip()]
         today = date.today().isoformat()
-        template_content = f"""---
+        _template_content = f"""---
 title: "{title_in.value}"
 date: {today}
 categories: {cats}
@@ -185,38 +185,26 @@ Write the public body here.
 Internal details for Confluence review.
 :::
 """
-        path = f"posts/{slug}/index.qmd"
+        _path = f"posts/{slug}/index.qmd"
         try:
             # Check it doesn't already exist
             try:
-                gh_get_file(path)
+                gh_get_file(_path)
                 mo.stop(True, mo.callout(mo.md(f"Post `{slug}` already exists"), kind="warn"))
             except Exception:
                 pass  # 404 expected — good
-            encoded = base64.b64encode(template_content.encode()).decode()
-            import httpx as _httpx
-            import os as _os
-            import json as _json
-            GITHUB_TOKEN = _os.environ["GITHUB_TOKEN"]
-            GITHUB_REPO = _os.environ.get("GITHUB_REPO", "octaflop/ima.ink")
-            GITHUB_BRANCH = _os.environ.get("GITHUB_BRANCH", "main")
-            API = f"https://api.github.com/repos/{GITHUB_REPO}"
-            HEADERS = {
-                "Authorization": f"Bearer {GITHUB_TOKEN}",
-                "Accept": "application/vnd.github+json",
-                "X-GitHub-Api-Version": "2022-11-28",
-            }
-            r = _httpx.put(
-                f"{API}/contents/{path}",
+            _encoded = base64.b64encode(_template_content.encode()).decode()
+            _r = httpx.put(
+                f"{API}/contents/{_path}",
                 headers=HEADERS,
                 json={
                     "message": f"post: create {slug}",
-                    "content": encoded,
+                    "content": _encoded,
                     "branch": GITHUB_BRANCH,
                 },
             )
-            r.raise_for_status()
-            mo.stop(True, mo.callout(mo.md(f"✅ Created `{path}` — edit it in the Posts tab"), kind="success"))
+            _r.raise_for_status()
+            mo.stop(True, mo.callout(mo.md(f"✅ Created `{_path}` — edit it in the Posts tab"), kind="success"))
         except Exception as e:
             mo.stop(True, mo.callout(mo.md(f"Error: {e}"), kind="danger"))
 
