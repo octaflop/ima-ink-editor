@@ -149,20 +149,18 @@ def _post_save_action(
     post_status = mo.md("")
     if save_btn.value and post_path:
         try:
-            result = gh_put_file(
+            _result = gh_put_file(
                 post_path, editor.value, sha, f"edit: update {post_select.value}"
             )
-            commit_url = result.get("commit", {}).get("html_url", "")
-            gh_url = (
-                f"https://github.com/{GITHUB_REPO}/blob/{GITHUB_BRANCH}/{post_path}"
-            )
-            links = (
-                f" — [commit]({commit_url}) · [GitHub]({gh_url})"
-                if commit_url
-                else f" — [GitHub]({gh_url})"
+            _commit_url = _result.get("commit", {}).get("html_url", "")
+            _gh_url = f"https://github.com/{GITHUB_REPO}/blob/{GITHUB_BRANCH}/{post_path}"
+            _links = (
+                f" — [commit]({_commit_url}) · [GitHub]({_gh_url})"
+                if _commit_url
+                else f" — [GitHub]({_gh_url})"
             )
             post_status = mo.callout(
-                mo.md(f"✅ Saved `{post_path}`{links}"),
+                mo.md(f"✅ Saved `{post_path}`{_links}"),
                 kind="success",
             )
         except Exception as e:
@@ -223,23 +221,21 @@ def _data_save_action(
     data_status = mo.md("")
     if data_save.value and data_path:
         try:
-            result = gh_put_file(
+            _result = gh_put_file(
                 data_path,
                 data_editor.value,
                 data_sha,
                 f"data: update {data_select.value}",
             )
-            commit_url = result.get("commit", {}).get("html_url", "")
-            gh_url = (
-                f"https://github.com/{GITHUB_REPO}/blob/{GITHUB_BRANCH}/{data_path}"
-            )
-            links = (
-                f" — [commit]({commit_url}) · [GitHub]({gh_url})"
-                if commit_url
-                else f" — [GitHub]({gh_url})"
+            _commit_url = _result.get("commit", {}).get("html_url", "")
+            _gh_url = f"https://github.com/{GITHUB_REPO}/blob/{GITHUB_BRANCH}/{data_path}"
+            _links = (
+                f" — [commit]({_commit_url}) · [GitHub]({_gh_url})"
+                if _commit_url
+                else f" — [GitHub]({_gh_url})"
             )
             data_status = mo.callout(
-                mo.md(f"✅ Saved `{data_path}`{links}"), kind="success"
+                mo.md(f"✅ Saved `{data_path}`{_links}"), kind="success"
             )
         except Exception as e:
             data_status = mo.callout(mo.md(f"❌ Save failed: {e}"), kind="danger")
@@ -310,20 +306,18 @@ Internal details for Confluence review.
             )
         else:
             try:
-                result = gh_put_file(
+                _result = gh_put_file(
                     _path, _template_content, "", f"post: create {slug}"
                 )
-                commit_url = result.get("commit", {}).get("html_url", "")
-                gh_url = (
-                    f"https://github.com/{GITHUB_REPO}/blob/{GITHUB_BRANCH}/{_path}"
-                )
-                links = (
-                    f" — [commit]({commit_url}) · [GitHub]({gh_url})"
-                    if commit_url
-                    else f" — [GitHub]({gh_url})"
+                _commit_url = _result.get("commit", {}).get("html_url", "")
+                _gh_url = f"https://github.com/{GITHUB_REPO}/blob/{GITHUB_BRANCH}/{_path}"
+                _links = (
+                    f" — [commit]({_commit_url}) · [GitHub]({_gh_url})"
+                    if _commit_url
+                    else f" — [GitHub]({_gh_url})"
                 )
                 new_post_status = mo.callout(
-                    mo.md(f"✅ Created `{_path}` — edit it in the Posts tab{links}"),
+                    mo.md(f"✅ Created `{_path}` — edit it in the Posts tab{_links}"),
                     kind="success",
                 )
             except Exception as e:
