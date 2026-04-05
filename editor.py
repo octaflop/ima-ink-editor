@@ -114,7 +114,7 @@ def _posts_tab(mo, gh_list_dir):
 def _post_editor(mo, post_select, gh_get_file):
     if not post_select.value:
         editor = mo.ui.code_editor(value="", language="markdown")
-        save_btn = mo.ui.button(label="Save & commit")
+        save_btn = mo.ui.run_button(label="Save & commit")
         sha = ""
         post_path = ""
         post_load_status = mo.md("")
@@ -130,7 +130,7 @@ def _post_editor(mo, post_select, gh_get_file):
                 mo.md(f"Error loading post: {e}"), kind="danger"
             )
         editor = mo.ui.code_editor(value=content, language="markdown")
-        save_btn = mo.ui.button(label="Save & commit")
+        save_btn = mo.ui.run_button(label="Save & commit")
     return editor, save_btn, sha, post_path, post_load_status
 
 
@@ -153,7 +153,9 @@ def _post_save_action(
                 post_path, editor.value, sha, f"edit: update {post_select.value}"
             )
             _commit_url = _result.get("commit", {}).get("html_url", "")
-            _gh_url = f"https://github.com/{GITHUB_REPO}/blob/{GITHUB_BRANCH}/{post_path}"
+            _gh_url = (
+                f"https://github.com/{GITHUB_REPO}/blob/{GITHUB_BRANCH}/{post_path}"
+            )
             _links = (
                 f" — [commit]({_commit_url}) · [GitHub]({_gh_url})"
                 if _commit_url
@@ -186,7 +188,7 @@ def _data_tab(mo):
 def _data_editor(mo, data_select, DATA_FILES, gh_get_file):
     if not data_select.value:
         data_editor = mo.ui.code_editor(value="", language="yaml")
-        data_save = mo.ui.button(label="Save & commit")
+        data_save = mo.ui.run_button(label="Save & commit")
         data_sha = ""
         data_path = ""
         data_load_status = mo.md("")
@@ -202,7 +204,7 @@ def _data_editor(mo, data_select, DATA_FILES, gh_get_file):
                 mo.md(f"Error loading {data_select.value}: {e}"), kind="danger"
             )
         data_editor = mo.ui.code_editor(value=_content, language="yaml")
-        data_save = mo.ui.button(label="Save & commit")
+        data_save = mo.ui.run_button(label="Save & commit")
     return data_editor, data_save, data_sha, data_path, data_load_status
 
 
@@ -228,7 +230,9 @@ def _data_save_action(
                 f"data: update {data_select.value}",
             )
             _commit_url = _result.get("commit", {}).get("html_url", "")
-            _gh_url = f"https://github.com/{GITHUB_REPO}/blob/{GITHUB_BRANCH}/{data_path}"
+            _gh_url = (
+                f"https://github.com/{GITHUB_REPO}/blob/{GITHUB_BRANCH}/{data_path}"
+            )
             _links = (
                 f" — [commit]({_commit_url}) · [GitHub]({_gh_url})"
                 if _commit_url
@@ -251,7 +255,7 @@ def _new_post_tab(mo):
         label="Categories (comma-separated)", placeholder="python, data"
     )
     desc_in = mo.ui.text(label="Description", placeholder="One-line summary")
-    create_btn = mo.ui.button(label="Create post")
+    create_btn = mo.ui.run_button(label="Create post")
 
     return title_in, slug_in, cats_in, desc_in, create_btn
 
@@ -310,7 +314,9 @@ Internal details for Confluence review.
                     _path, _template_content, "", f"post: create {slug}"
                 )
                 _commit_url = _result.get("commit", {}).get("html_url", "")
-                _gh_url = f"https://github.com/{GITHUB_REPO}/blob/{GITHUB_BRANCH}/{_path}"
+                _gh_url = (
+                    f"https://github.com/{GITHUB_REPO}/blob/{GITHUB_BRANCH}/{_path}"
+                )
                 _links = (
                     f" — [commit]({_commit_url}) · [GitHub]({_gh_url})"
                     if _commit_url
@@ -328,7 +334,7 @@ Internal details for Confluence review.
 @app.cell
 def _deploy_btn(mo):
     # ── Force redeploy ─────────────────────────────────────────────────────────
-    deploy_btn = mo.ui.button(label="Force redeploy ima.ink", kind="danger")
+    deploy_btn = mo.ui.run_button(label="Force redeploy ima.ink", kind="danger")
     return (deploy_btn,)
 
 
