@@ -109,7 +109,11 @@ def _posts_tab(mo, gh_list_dir):
 @app.cell
 def _post_editor(mo, post_select, gh_get_file):
     if not post_select.value:
-        mo.stop(True)
+        editor = mo.ui.code_editor(value="", language="markdown")
+        save_btn = mo.ui.button(label="Save & commit")
+        sha = ""
+        _path = ""
+        return editor, save_btn, sha, _path
 
     _path = f"posts/{post_select.value}/index.qmd"
     try:
@@ -119,13 +123,12 @@ def _post_editor(mo, post_select, gh_get_file):
 
     editor = mo.ui.code_editor(value=content, language="markdown")
     save_btn = mo.ui.button(label="Save & commit")
-
     return editor, save_btn, sha, _path
 
 
 @app.cell
 def _post_save_action(mo, post_select, editor, save_btn, sha, _path, gh_put_file):
-    if save_btn.value:
+    if save_btn.value and _path:
         try:
             gh_put_file(_path, editor.value, sha, f"edit: update {post_select.value}")
             mo.stop(True, mo.callout(mo.md(f"✅ Saved `{_path}` — deploy triggered by GHA"), kind="success"))
@@ -148,7 +151,11 @@ def _data_tab(mo):
 @app.cell
 def _data_editor(mo, data_select, DATA_FILES, gh_get_file):
     if not data_select.value:
-        mo.stop(True)
+        data_editor = mo.ui.code_editor(value="", language="yaml")
+        data_save = mo.ui.button(label="Save & commit")
+        _sha = ""
+        _path = ""
+        return data_editor, data_save, _sha, _path
 
     _path = DATA_FILES[data_select.value]
     try:
@@ -158,13 +165,12 @@ def _data_editor(mo, data_select, DATA_FILES, gh_get_file):
 
     data_editor = mo.ui.code_editor(value=_content, language="yaml")
     data_save = mo.ui.button(label="Save & commit")
-
     return data_editor, data_save, _sha, _path
 
 
 @app.cell
 def _data_save_action(mo, data_select, data_editor, data_save, _sha, _path, gh_put_file):
-    if data_save.value:
+    if data_save.value and _path:
         try:
             gh_put_file(_path, data_editor.value, _sha, f"data: update {data_select.value}")
             mo.stop(True, mo.callout(mo.md(f"✅ Saved `{_path}`"), kind="success"))
