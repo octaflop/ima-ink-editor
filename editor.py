@@ -107,9 +107,9 @@ def _post_editor(mo, post_select, gh_get_file, gh_put_file):
     if not post_select.value:
         mo.stop(False)
 
-    path = f"posts/{post_select.value}/index.qmd"
+    _path = f"posts/{post_select.value}/index.qmd"
     try:
-        content, sha = gh_get_file(path)
+        content, sha = gh_get_file(_path)
     except Exception as e:
         mo.stop(True, mo.callout(mo.md(f"Error loading post: {e}"), kind="danger"))
 
@@ -118,7 +118,7 @@ def _post_editor(mo, post_select, gh_get_file, gh_put_file):
 
     if save_btn.value:
         try:
-            gh_put_file(path, editor.value, sha, f"edit: update {post_select.value}")
+            gh_put_file(_path, editor.value, sha, f"edit: update {post_select.value}")
             mo.stop(True, mo.callout(mo.md(f"✅ Saved `{path}` — deploy triggered by GHA"), kind="success"))
         except Exception as e:
             mo.stop(True, mo.callout(mo.md(f"Error saving: {e}"), kind="danger"))
@@ -137,9 +137,9 @@ def _data_tab(mo, gh_get_file, gh_put_file):
     data_select = mo.ui.dropdown(options=list(DATA_FILES.keys()), label="Select data file")
 
     if data_select.value:
-        path = DATA_FILES[data_select.value]
+        _path = DATA_FILES[data_select.value]
         try:
-            _content, _sha = gh_get_file(path)
+            _content, _sha = gh_get_file(_path)
         except Exception as e:
             mo.stop(True, mo.callout(mo.md(f"Error: {e}"), kind="danger"))
 
@@ -148,7 +148,7 @@ def _data_tab(mo, gh_get_file, gh_put_file):
 
         if data_save.value:
             try:
-                gh_put_file(path, data_editor.value, _sha, f"data: update {data_select.value}")
+                gh_put_file(_path, data_editor.value, _sha, f"data: update {data_select.value}")
                 mo.stop(True, mo.callout(mo.md(f"✅ Saved `{path}`"), kind="success"))
             except Exception as e:
                 mo.stop(True, mo.callout(mo.md(f"Error: {e}"), kind="danger"))
