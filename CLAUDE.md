@@ -110,4 +110,4 @@ docker run -e GITHUB_TOKEN=$TOKEN -p 2719:2719 ima-editor
 
 ## Deployment
 
-via hbox
+via hbox, and hopefully with git webhooks
